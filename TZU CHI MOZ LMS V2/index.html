@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tzu Chi Moz LMS — Logistics Management System</title>
+<meta name="description" content="Unified Logistics Management System for Tzu Chi Foundation Mozambique — Transportation and Warehouse & Procurement.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login-screen" class="login-screen">
+  <div class="login-brand">
+    <div class="login-brand-inner">
+      <div class="login-brand-header">
+        <div class="login-brand-logo"><img src="tzu-chi-logo.jpg" alt="Tzu Chi Moçambique"></div>
+        <div class="login-brand-word"><strong data-i18n="login.eyebrow">Tzu Chi Foundation Mozambique</strong><span>Tzu Chi Moz LMS</span></div>
+      </div>
+      <h1 class="login-headline" data-i18n="login.headline">Logistics Management<br>System</h1>
+      <p class="login-copy" data-i18n="login.copy">One platform for Transportation and Warehouse &amp; Procurement across Sofala Province — replacing WhatsApp approvals, paper forms and scattered spreadsheets.</p>
+      <div class="login-stats" id="login-stats"></div>
+      <div class="login-stats-dots" id="login-stats-dots"></div>
+    </div>
+    <div class="login-brand-decor"></div>
+  </div>
+  <div class="login-panel">
+    <div class="login-form-wrap">
+      <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <p class="eyebrow blue" data-i18n="login.tagline" style="margin-bottom:0">Tzu Chi Moz LMS · v2 (merged)</p>
+        <div class="lang-switch"><button data-lang="en">EN</button><button data-lang="pt">PT</button><button data-lang="zh">中文</button></div>
+      </div>
+      <h2 class="login-form-title" data-i18n="login.welcome" style="margin-top:12px">Welcome back</h2>
+      <p class="muted" style="margin:0 0 20px;" data-i18n="login.chooseDemo">Choose a demo role below or sign in manually.</p>
+      <div class="demo-role-grid" id="demo-role-grid"></div>
+      <div class="login-divider"><span data-i18n="login.or">or sign in manually</span></div>
+      <form id="login-form">
+        <label><span data-i18n="login.emailLabel">Email or username</span><input id="login-email" type="text" placeholder="name@tzuchi.org.mz" autocomplete="username" required></label>
+        <label><span data-i18n="login.passwordLabel">Password</span><input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required></label>
+        <button class="primary-btn full-w" type="submit" data-i18n="login.signIn">Sign in securely</button>
+        <p id="login-error" class="form-error" aria-live="polite"></p>
+      </form>
+      <p class="login-footer-note" data-i18n="login.footer">Demo prototype — no real data stored.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HUB (post-login module chooser) ============ -->
+<section id="hub-screen" class="hub-screen hidden">
+  <header class="hub-topbar">
+    <div class="brand-mini"><div class="brand-mark small"><img src="tzu-chi-logo.jpg" alt="Tzu Chi Moçambique"></div><div><strong>Tzu Chi Moz LMS</strong><span>Logistics Management System</span></div></div>
+    <div class="hub-user">
+      <div class="lang-switch"><button data-lang="en">EN</button><button data-lang="pt">PT</button><button data-lang="zh">中文</button></div>
+      <div class="avatar-box" id="hub-avatar">--</div>
+      <div class="user-mini"><strong id="hub-user-name">—</strong><span id="hub-user-role">—</span></div>
+      <button id="hub-logout-btn" class="icon-btn" title="Sign out" aria-label="Sign out">&#x2197;</button>
+    </div>
+  </header>
+  <div class="hub-body">
+    <p class="eyebrow blue" data-i18n="hub.choose">Choose a module</p>
+    <h2 class="hub-title" data-i18n="hub.title">Where do you need to work today?</h2>
+    <p class="muted" style="max-width:640px" data-i18n="hub.copy">Each module keeps the permissions defined for your role — you only see and act on what your role allows.</p>
+    <div class="hub-cards" id="hub-cards"></div>
+  </div>
+</section>
+
+<!-- ============ MODULE APP SHELL ============ -->
+<div id="app" class="app hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <button class="brand-mark small as-btn" id="back-to-hub" title="Back to hub"><img src="tzu-chi-logo.jpg" alt="Tzu Chi Moçambique"></button>
+      <div class="sidebar-brand-text"><strong id="module-name">—</strong><span>Tzu Chi Moz LMS</span></div>
+    </div>
+    <button class="hub-return-btn" id="hub-return-btn" data-i18n="common.allModules">&#8592; All modules</button>
+    <nav id="sidebar-nav"></nav>
+    <div class="sidebar-foot">
+      <div class="avatar-box" id="avatar-box">--</div>
+      <div class="user-mini">
+        <strong id="user-display-name">—</strong>
+        <span id="user-display-role">—</span>
+      </div>
+      <button id="logout-btn" class="icon-btn" title="Sign out" aria-label="Sign out">&#x2197;</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <p class="eyebrow blue" id="page-eyebrow">Operations overview</p>
+        <h2 class="page-title" id="page-title">Dashboard</h2>
+      </div>
+      <div class="topbar-right">
+        <div class="lang-switch"><button data-lang="en">EN</button><button data-lang="pt">PT</button><button data-lang="zh">中文</button></div>
+        <span class="live-pill"><i></i> <span data-i18n="common.liveDemo">Live demo</span></span>
+        <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="gsearch" data-i18n-ph="common.search" placeholder="Search this list…"></div>
+        <button id="notify-btn" class="notification-btn" aria-label="Notifications">&#x1F514;<b id="notify-count">0</b></button>
+        <button id="quick-action-btn" class="primary-btn compact hidden"></button>
+      </div>
+    </header>
+    <div id="view" class="view active"></div>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <button id="modal-close" class="modal-close" aria-label="Close">&#x00D7;</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+<div id="drawer-bg" class="drawer-bg"></div>
+<aside id="drawer" class="drawer" role="dialog" aria-modal="true">
+  <div class="drawer-h">
+    <div style="flex:1;min-width:0"><p class="eyebrow blue" id="drawer-sub">—</p><h3 id="drawer-title">—</h3></div>
+    <button id="drawer-close" class="drawer-x" aria-label="Close">&#x00D7;</button>
+  </div>
+  <div class="drawer-b" id="drawer-content"></div>
+</aside>
+<div id="toast-stack" class="toast-stack"></div>
+
+<!-- ============ AI ASSISTANT (shared shell — active module decides who answers) ============ -->
+<button id="ai-fab" class="ai-fab hidden" aria-label="Ask the assistant">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+</button>
+<aside id="ai-panel" class="ai-panel" role="dialog" aria-label="LMS Assistant">
+  <div class="ai-head">
+    <div style="flex:1;min-width:0">
+      <p class="eyebrow" style="color:#9fc4e0" id="ai-title">Assistant</p>
+      <div style="font-size:13.5px;font-weight:600;color:#fff" id="ai-subtitle">Ask about stock, requisitions or the system</div>
+    </div>
+    <button id="ai-close" class="drawer-x" style="color:#9fc4e0" aria-label="Close">&#x00D7;</button>
+  </div>
+  <div class="ai-log" id="ai-log"></div>
+  <div class="ai-chips" id="ai-chips"></div>
+  <div class="ai-bar">
+    <input id="ai-input" placeholder="Ask a question…" autocomplete="off">
+    <button id="ai-send" class="primary-btn compact" aria-label="Send">&#x27A4;</button>
+  </div>
+</aside>
+
+<script src="app.js"></script>
+<script src="transport.js"></script>
+<script src="warehouse.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
