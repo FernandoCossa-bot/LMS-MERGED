@@ -265,16 +265,12 @@ T.NAV = role => {
     dashboard: {icon:'⊞', label:tnT('dashboard'), title:tnT('dashboard'), sub:t('navT.coordDash.s')||tsT('dashboard'), group:tg('Overview')},
     requests:  {icon:'↗', label:t('navT.coordRequests.l')||tnT('requests'), title:tnT('requests'), sub:tsT('coordRequests')||'', group:tg('Overview')}
   };
-  if (role === 'top_management') return {
-    dashboard: {icon:'⊞', label:tnT('dashboard'), title:tnT('dashboard'), sub:tsT('execDash')||tsT('dashboard'), group:tg('Overview')},
-    budget:    {icon:'💵', label:tnT('budget'), title:tnT('budget'), sub:tsT('budget'), badge:(finPend+T.HIRE_REQUESTS.filter(h=>T.canApproveHire(h)).length)||'', group:tg('Finance')},
-    reports:   {icon:'📊', label:tnT('reports'), title:tnT('reports'), sub:tsT('reports'), group:tg('Insight')}
-  };
   if (role === 'admin') return {
     dashboard: {icon:'⊞', label:tnT('dashboard'), title:tnT('dashboard'), sub:tsT('adminDash')||tsT('dashboard'), group:tg('Overview')},
     reports:   {icon:'📊', label:tnT('reports'), title:tnT('reports'), sub:tsT('reports'), group:tg('Insight')}
   };
-  // logistics: full operational visibility
+  // logistics + top_management: identical full operational visibility — Top Management
+  // holds the same permissions as the Logistics Department, so it gets the same nav.
   return {
     dashboard:  {icon:'⊞', label:tnT('dashboard'), title:tnT('dashboard'), sub:tsT('dashboard'), group:tg('Overview')},
     tower:      {icon:'🎛', label:tnT('tower'), title:tnT('tower'), sub:tsT('tower'), group:tg('Overview')},
@@ -337,22 +333,32 @@ T.render = view => {
 T.renderDashboard = () => {
   const role = activeUser.role;
   if (role === 'coordinator') return T.renderCoordDash();
-  if (role === 'top_management') return T.renderExecDash();
   return T.renderManagerDash();
 };
 T.renderManagerDash = () => {
   const active = T.VEHICLES.filter(v=>v.status==='active').length, alerts = T.VEHICLES.filter(v=>v.status==='alert').length;
   const pending = T.REQUESTS.filter(r=>r.status==='pending').length, inProg = T.REQUESTS.filter(r=>r.status==='in-progress').length;
-  const finPend = T.FINANCE.filter(f=>f.status==='pending').length, restWarn = T.DRIVER_ATTENDANCE.filter(d=>d.rest<11).length;
+  const finPend = T.FINANCE.filter(f=>f.status==='pending').length, restWarn = T.DRIVER_ATTENDANCE.filter(d=>d.rest<11);
+  const canExport = hasPermFlag(activeUser,'reports');
+  const reqByStatus = ['pending','approved','assigned','in-progress','completed'].map(s => [s, T.REQUESTS.filter(r=>r.status===s).length]);
   $('view').innerHTML = `${!T.withinWindow()?`<div class="alert-banner warning" style="margin-bottom:16px">⏰ <div>The daily transport-request window (10:00–16:00) is currently closed. Requests submitted now queue for the next opening.${T.isSaturday()?' Reminder: weekly vehicle plans are due today before 14:00.':''}</div></div>`:''}
   <div class="grid kpi-grid" style="margin-bottom:20px">
-  ${T.kpi('Fleet active', active, 'of '+T.VEHICLES.length+' vehicles', 'good', '', "switchView('fleet')")}
+  ${T.kpi('Fleet active', active, 'of '+T.VEHICLES.length+' vehicles', 'good', '', "T.showFleetBreakdown()")}
   ${T.kpi('Active missions', inProg, pending+' awaiting scheduling', '', '', "switchView('dispatch')")}
   ${T.kpi('Karan balance', (T.KARAN.balance/1000).toFixed(0)+'k', T.KARAN.balance<=T.KARAN.threshold?'Below alert threshold':'Healthy', T.KARAN.balance<=T.KARAN.threshold?'bad':'good', '', "switchView('fuel')")}
-  ${T.kpi('Driver alerts', alerts+restWarn, alerts+' low-fuel · '+restWarn+' rest warnings', 'warn', '', "T.showDriverAlerts()")}
+  ${T.kpi('Driver alerts', alerts+restWarn.length, alerts+' low-fuel · '+restWarn.length+' rest warnings', 'warn', '', "T.showDriverAlerts()")}
   </div>
+  ${canExport ? `<div class="row" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px"><button class="action-btn compact" onclick="T.exportDashboardPDF()">⭳ Download PDF</button><button class="action-btn compact" onclick="T.exportDashboardExcel()">⭳ Download Excel</button></div>` : ''}
   <div class="grid two-col"><div class="card"><div class="card-header"><div><h3>Live fleet location</h3><p>Demo GPS positions - Sofala Province</p></div><button class="text-btn" onclick="switchView('fleet')">Fleet register</button></div>${T.fleetMapHTML()}</div>
-  <div class="card"><div class="card-header"><div><h3>Live operations feed</h3><p>Recent alerts and events</p></div></div>${T.activityFeedHTML(9)}</div></div>`;
+  <div class="card"><div class="card-header"><div><h3>Live operations feed</h3><p>Recent alerts and events</p></div></div>${T.activityFeedHTML(9)}</div></div>
+  <div class="grid two-col" style="margin-top:18px">
+  <div class="card"><div class="card-header"><div><h3>Fleet composition</h3><p>${T.VEHICLES.length} vehicles department-wide</p></div></div>
+  <div class="table-wrap"><table class="data-table"><thead><tr><th>Plate</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Fuel</th><th>Odometer</th></tr></thead><tbody>${T.VEHICLES.map(v=>`<tr><td><strong>${esc(v.plate)}</strong></td><td class="small">${esc(v.name)}</td><td class="small">${esc(v.driver||'—')}</td><td>${T.statusTag(v.status)}</td><td class="small">${v.fuel}%</td><td class="small">${nf(v.km)} km</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card"><div class="card-header"><div><h3>Requests by stage</h3><p>Whole pipeline, this dataset</p></div></div><div class="card-body">${reqByStatus.map(([s,n])=>{const max=Math.max(1,...reqByStatus.map(r=>r[1]));return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span style="text-transform:capitalize">${esc(s)}</span><span class="muted">${n}</span></div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%"></div></div></div>`;}).join('')}</div>
+  <div class="card-header" style="border-top:1px solid var(--line)"><div><h3>Driver rest compliance</h3><p>Minimum 11h rest — SOP §People</p></div></div>
+  <div class="activity-list">${restWarn.length?restWarn.map(d=>`<div class="activity-item"><div class="activity-dot" style="background:var(--red)"></div><div><strong>${esc(d.name)}</strong><span>${d.rest}h rest — below the 11h minimum</span></div></div>`).join(''):'<div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><strong>All drivers within rest limits</strong></div></div>'}</div>
+  </div>
+  </div>`;
   T.initFleetMap();
 };
 T.renderCoordDash = () => {
@@ -367,36 +373,8 @@ T.renderCoordDash = () => {
   <div class="grid two-col"><div class="card"><div class="card-header"><div><h3>Fleet visibility</h3><p>Operational awareness — read only</p></div></div>${T.fleetMapHTML()}</div><div class="card"><div class="card-header"><div><h3>Operations feed</h3><p>Recent activity</p></div></div>${T.activityFeedHTML(8)}</div></div>`;
   T.initFleetMap();
 };
-T.renderExecDash = () => {
-  const active = T.VEHICLES.filter(v=>v.status==='active').length, alert = T.VEHICLES.filter(v=>v.status==='alert').length, offline = T.VEHICLES.filter(v=>v.status==='offline').length;
-  const pending = T.REQUESTS.filter(r=>r.status==='pending').length;
-  const pct = Math.round((active/T.VEHICLES.length)*100);
-  const canExport = hasPermFlag(activeUser,'reports');
-  const reqByStatus = ['pending','approved','assigned','in-progress','completed'].map(s => [s, T.REQUESTS.filter(r=>r.status===s).length]);
-  const restWarn = T.DRIVER_ATTENDANCE.filter(d=>d.rest<11);
-  $('view').innerHTML = `<div class="grid kpi-grid" style="margin-bottom:20px">
-  ${T.kpi('Fleet readiness', pct+'%', active+' of '+T.VEHICLES.length+' vehicles', 'good', '', "T.showFleetBreakdown()")}
-  ${T.kpi('On-time missions', '92%', '+4% vs. prior month', 'good')}
-  ${T.kpi('Open requests', pending, 'Awaiting scheduling', pending?'warn':'')}
-  ${T.kpi('Hire above threshold', T.HIRE_REQUESTS.filter(h=>T.canApproveHire(h)).length, 'Awaiting your sign-off', 'warn', '', "switchView('budget')")}
-  </div>
-  ${canExport ? `<div class="row" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px"><button class="action-btn compact" onclick="T.exportDashboardPDF()">⭳ Download PDF</button><button class="action-btn compact" onclick="T.exportDashboardExcel()">⭳ Download Excel</button></div>` : ''}
-  <div class="grid two-col"><div class="card"><div class="card-header"><div><h3>Fleet operating picture</h3><p>Executive view — Sofala Province</p></div></div>${T.fleetMapHTML()}</div>
-  <div class="card"><div class="card-header"><div><h3>Decision signals</h3><p>Items requiring attention</p></div></div><div class="activity-list">${T.exceptions().slice(0,6).map(e=>`<div class="activity-item"><div class="activity-dot" style="background:${e.sev==='Critical'?'var(--red)':'var(--amber)'}"></div><div><strong>${esc(e.area)}</strong><span>${esc(e.what)}</span></div></div>`).join('')}</div><div style="padding:16px 20px"><button class="primary-btn compact" onclick="switchView('budget')">Review finance approvals</button></div></div></div>
-  <div class="grid two-col" style="margin-top:18px">
-  <div class="card"><div class="card-header"><div><h3>Fleet composition</h3><p>${T.VEHICLES.length} vehicles department-wide</p></div></div>
-  <div class="table-wrap"><table class="data-table"><thead><tr><th>Plate</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Fuel</th><th>Odometer</th></tr></thead><tbody>${T.VEHICLES.map(v=>`<tr><td><strong>${esc(v.plate)}</strong></td><td class="small">${esc(v.name)}</td><td class="small">${esc(v.driver||'—')}</td><td>${T.statusTag(v.status)}</td><td class="small">${v.fuel}%</td><td class="small">${nf(v.km)} km</td></tr>`).join('')}</tbody></table></div></div>
-  <div class="card"><div class="card-header"><div><h3>Requests by stage</h3><p>Whole pipeline, this dataset</p></div></div><div class="card-body">${reqByStatus.map(([s,n])=>{const max=Math.max(1,...reqByStatus.map(r=>r[1]));return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span style="text-transform:capitalize">${esc(s)}</span><span class="muted">${n}</span></div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%"></div></div></div>`;}).join('')}</div>
-  <div class="card-header" style="border-top:1px solid var(--line)"><div><h3>Driver rest compliance</h3><p>Minimum 11h rest — SOP §People</p></div></div>
-  <div class="activity-list">${restWarn.length?restWarn.map(d=>`<div class="activity-item"><div class="activity-dot" style="background:var(--red)"></div><div><strong>${esc(d.name)}</strong><span>${d.rest}h rest — below the 11h minimum</span></div></div>`).join(''):'<div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><strong>All drivers within rest limits</strong></div></div>'}</div>
-  </div>
-  </div>
-  <div class="role-note" style="margin-top:14px">Top Management has read-only visibility into fleet, requests and driver compliance, plus finance and high-value hire approvals above ${T.THRESHOLD?nf(T.THRESHOLD):'50,000'} MZN. Operational records are managed by the Logistics Department.</div>`;
-  T.initFleetMap();
-};
-
-/* ---- report exports — mirrors the warehouse module's, so Top Management can pull a
-   snapshot of Transportation without needing Logistics to compile one. ---- */
+/* ---- report exports — Logistics Department and Top Management hold the same
+   permissions, so both can pull a snapshot straight from the dashboard. ---- */
 T.exportDashboardExcel = () => {
   exportExcel('transportation-dashboard', 'Transportation — Dashboard Export', [
     { heading:'Fleet', headers:['Plate','Vehicle','Driver','Status','Fuel %','Odometer (km)','Location'],
@@ -493,8 +471,8 @@ T.renderRequests = () => {
   const isCoord = activeUser.role==='coordinator';
   let list = isCoord ? T.REQUESTS.filter(r=>r.requester===activeUser.name) : T.REQUESTS.slice();
   list.sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));
-  const canCreate = ['logistics','coordinator'].includes(activeUser.role);
-  const canSchedule = activeUser.role==='logistics';
+  const canCreate = ['logistics','top_management','coordinator'].includes(activeUser.role);
+  const canSchedule = ['logistics','top_management'].includes(activeUser.role);
   $('view').innerHTML = `<div class="alert-banner ${T.withinWindow()?'success':'warning'}" style="margin-bottom:16px">⏰ <div><strong>Daily submission window: 10:00–16:00.</strong> ${T.withinWindow()?'Open now.':'Closed — requests queue for the next window.'} 24-hour rule: submit by 16:00 the day before the trip. Weekly plans due every Saturday before 14:00.</div></div>
   <div class="card"><div class="card-header"><div><h3>${isCoord?'My Requests':'Transport Requests'}</h3><p>${list.length} records for this role</p></div>${canCreate?'<button class="primary-btn compact" onclick="T.openRequestForm()">+ New request</button>':''}</div>
   <div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Date & route</th><th>Activity</th><th>Requester</th><th>Assignment</th><th>Status</th><th></th></tr></thead><tbody>
@@ -830,8 +808,8 @@ T.sopReporting = () => `<div class="sop-doc"><span class="code-chip">Section 05<
 T.notifications = () => {
   const n = []; const u = activeUser; if (!u) return n;
   T.REQUESTS.forEach(r => {
-    if (r.status==='pending' && activeUser.role==='logistics') n.push({k:'req:'+r.id, sev:'action', t:'Trip request awaiting scheduling', d:r.id+' — '+r.activity, at:r.submittedAt});
-    if (r.status==='approved' && activeUser.role==='logistics') n.push({k:'ticket:'+r.id, sev:'action', t:'Ready for Trip Ticket', d:r.id+' — vehicle & driver assigned', at:r.submittedAt});
+    if (r.status==='pending' && ['logistics','top_management'].includes(activeUser.role)) n.push({k:'req:'+r.id, sev:'action', t:'Trip request awaiting scheduling', d:r.id+' — '+r.activity, at:r.submittedAt});
+    if (r.status==='approved' && ['logistics','top_management'].includes(activeUser.role)) n.push({k:'ticket:'+r.id, sev:'action', t:'Ready for Trip Ticket', d:r.id+' — vehicle & driver assigned', at:r.submittedAt});
     if (r.requester===u.name && ['approved','assigned','completed','cancelled'].includes(r.status)) n.push({k:'mine:'+r.id+':'+r.status, sev:r.status==='cancelled'?'bad':'info', t:'Your request was '+(T.STATUS_LABELS[r.status]||r.status).toLowerCase(), d:r.id, at:r.submittedAt});
   });
   if (T.KARAN.balance<=T.KARAN.threshold) n.push({k:'karan-low', sev:'bad', t:'Karan balance below threshold', d:nf(T.KARAN.balance)+' MZN — prepare a top-up request', at:new Date().toISOString()});

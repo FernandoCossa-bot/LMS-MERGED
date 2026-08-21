@@ -167,8 +167,10 @@ const PERM_CATALOG = [
 function defaultPermsForRole(role){
   const p = {}; PERM_CATALOG.forEach(e => p[e.key] = false);
   if (role === 'admin') { p.reports = true; p.audit = true; p.manageUsers = true; }
-  else if (role === 'logistics') { p.create = true; p.approve = true; p.release = true; p.receive = true; p.operate = true; p.reports = true; }
-  else if (role === 'top_management') { p.authorizeHigh = true; p.reports = true; p.audit = true; }
+  // Logistics Department and Top Management carry identical operational permissions —
+  // Top Management additionally keeps authorizeHigh/audit, which Logistics also gets
+  // here so the two roles are genuinely equal, not "TM plus a couple of extras".
+  else if (role === 'logistics' || role === 'top_management') { p.create = true; p.approve = true; p.authorizeHigh = true; p.release = true; p.receive = true; p.operate = true; p.reports = true; p.audit = true; }
   else if (role === 'coordinator') { p.create = true; }
   return p;
 }

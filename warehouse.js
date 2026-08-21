@@ -329,19 +329,12 @@ W.NAV = role => {
     dashboard: {icon:'⊞', label:tnW('dashboard'), title:tnW('dashboard'), sub:tsW('dashboardCoord'), group:tg('Overview')},
     requisitions: {icon:'📝', label:tnW('requisitionsMine'), title:tnW('requisitionsMine'), sub:tsW('requisitionsMine'), badge:mine||'', group:tg('Overview')}
   };
-  if (role === 'top_management') return {
-    dashboard: {icon:'⊞', label:tnW('dashboard'), title:tnW('dashboard'), sub:tsW('dashboardTM'), group:tg('Overview')},
-    inventory: {icon:'📦', label:tnW('inventory'), title:tnW('inventory'), sub:tsW('inventory'), badge:low||'', group:tg('Warehouse')},
-    requisitions: {icon:'📝', label:tnW('requisitions'), title:tnW('requisitions'), sub:tsW('requisitionsTM').replace('{n}',W.THRESHOLD.toLocaleString()), badge:awaitingHigh||'', group:tg('Warehouse')},
-    warehouses: {icon:'🏬', label:tnW('warehouses'), title:tnW('warehouses'), sub:tsW('warehouses'), group:tg('Warehouse')},
-    budget: {icon:'💰', label:tnW('budget'), title:tnW('budget'), sub:tsW('budget'), group:tg('Resources')},
-    reports: {icon:'📊', label:tnW('reports'), title:tnW('reports'), sub:tsW('reports'), group:tg('Insight')}
-  };
   if (role === 'admin') return {
     dashboard: {icon:'⊞', label:tnW('dashboard'), title:tnW('dashboard'), sub:tsW('dashboardAdmin'), group:tg('Overview')},
     reports: {icon:'📊', label:tnW('reports'), title:tnW('reports'), sub:tsW('reports'), group:tg('Insight')}
   };
-  // logistics: full operational control
+  // logistics + top_management: identical full operational control — Top Management
+  // holds the same permissions as the Logistics Department, so it gets the same nav.
   return {
     dashboard: {icon:'⊞', label:tnW('dashboard'), title:tnW('dashboard'), sub:tsW('dashboard'), group:tg('Overview')},
     tower: {icon:'🎛', label:tnW('tower'), title:tnW('tower'), sub:tsW('tower'), group:tg('Overview')},

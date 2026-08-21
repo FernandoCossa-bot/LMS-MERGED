@@ -35,8 +35,8 @@
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body { font-family: 'DM Sans', 'Noto Sans TC', system-ui, sans-serif; color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
+body { font-family: 'DM Sans', 'Noto Sans TC', system-ui, sans-serif; color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 :lang(zh) { font-family: 'Noto Sans TC', 'DM Sans', system-ui, sans-serif; }
 button, input, select, textarea { font: inherit; }
 a { text-decoration: none; }
@@ -348,14 +348,32 @@ button.brand-mark { cursor: pointer; }
   .login-brand  { display: none; }
   .sidebar { width: 100%; min-width:0; position: static; height: auto; flex-direction: row; flex-wrap: wrap; }
   #sidebar-nav { flex-direction: row; overflow-x: auto; padding: 8px; }
+  #sidebar-nav .nav-group { display: none; } /* section headers don't read well inside a horizontal scroll strip */
   .sidebar-foot, .hub-return-btn { display: none; }
   .main-content { margin-left: 0; padding: 0 16px 32px; }
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .three-col, .task-meta-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .full { grid-column: auto; }
-  .hub-topbar { padding: 14px 18px; }
+  /* Topbar/hub-topbar were a single no-wrap flex row — on a phone-width viewport
+     the search box, language switch, live pill and notification bell together are
+     wider than the screen, so the row overflowed instead of laying out. Letting it
+     wrap (and dropping the fixed-width search to 100%) is the actual fix. */
+  .topbar { height: auto; flex-wrap: wrap; align-items: flex-start; padding: 14px 0 10px; gap: 10px 0; position: static; }
+  .topbar-left { width: 100%; }
+  .topbar-right { width: 100%; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+  .live-pill { display: none; }
+  .search { flex: 1 1 140px; min-width: 0; }
+  .search input { width: 100%; }
+  .quick-action-btn { margin-left: auto; }
+  .hub-topbar { padding: 14px 18px; flex-wrap: wrap; gap: 10px; }
+  .hub-user { flex-wrap: wrap; }
   .hub-body { padding: 34px 18px 60px; }
+}
+@media (max-width: 420px) {
+  .demo-role-grid { grid-template-columns: 1fr; }
+  .login-panel { padding: 32px 20px; }
+  .lang-switch button { padding: 5px 8px; font-size: 11px; }
 }
 
 /* ============================================================

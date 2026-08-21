@@ -2,6 +2,11 @@
 
 This folder merges the two standalone prototypes (`Transportation System/` and `WAREHOUSE SYSTEM/`) into one system with a single login and a shared role model. It's a client-side demo (in-memory data, no backend) — the same status as the two source prototypes.
 
+## v1.6 — Top Management now equal to Logistics Department, mobile layout fix
+
+- **Top Management holds the same permissions as the Logistics Department** in both modules — create, verify/approve, authorise high-value, release, receive, operate and reports/audit are now identical between the two roles, and both get the same full sidebar (Control Tower, Requisitions, Receiving, Movements, Fleet, Dispatch, Fuel, Maintenance, Hire, Compliance, Budget, SOP, etc.), not a cut-down read-only subset. Existing accounts pick this up automatically since permissions are computed from role defaults at load.
+- **Fixed the mobile layout.** The topbar (search box, language switch, live-status pill, notification bell) was a single non-wrapping flex row wider than a phone screen, so it overflowed sideways instead of laying out — the actual cause of the app looking broken in a phone webview. It now wraps onto multiple rows below 760px, the search box goes full-width, the live pill hides to save space, and the hub topbar wraps too. Added a global `overflow-x:hidden` safety net and a sub-420px breakpoint for very small phones.
+
 ## v1.5 — richer Top Management dashboards, PDF/Excel report downloads
 
 - **Top Management now gets a genuinely detailed picture of both departments**, not just headline KPIs. Transportation's executive dashboard adds a full fleet composition table (plate, vehicle, driver, status, fuel, odometer), a requests-by-stage breakdown chart and driver rest-compliance visibility — the same depth of detail Logistics sees, still read-only.
