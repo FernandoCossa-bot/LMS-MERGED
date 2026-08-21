@@ -73,6 +73,20 @@ W.ITEMS = [
   WI('TCM-EQP-004','Volunteer safety vest','EQP','Piece',150,50,'W1','C-03-01',285,''),
   WI('TCM-OFF-001','A4 paper ream','OFF','Ream',55,30,'W2','M-05-01',340,'')
 ];
+/* Representative "main products" per relief category, shown as a stock-level panel on
+   the dashboard so anyone landing there — Top Management included — sees at a glance
+   what's actually inside the warehouses, not just an aggregate value figure. */
+W.KEY_ITEMS = ['TCM-FOD-001','TCM-SHL-001','TCM-SHL-002','TCM-SHL-004','TCM-HYG-001','TCM-MED-001','TCM-EDU-001','TCM-EQP-001'];
+W.keyStockHTML = () => W.KEY_ITEMS.map(id => {
+  const i = W.item(id);
+  const pct = Math.min(100, Math.round(i.qty/Math.max(1,i.reorder*3)*100));
+  const low = i.qty < i.reorder;
+  return `<div class="stocklevel-row" onclick="W.openItem('${i.id}')">
+    <div class="stocklevel-head"><strong>${esc(i.name)}</strong><span class="${low?'danger':'muted'}">${nf(i.qty)} ${esc(i.unit)}</span></div>
+    <div class="bar-track"><div class="bar-fill${low?' bad':''}" style="width:${pct}%"></div></div>
+    <div class="stocklevel-sub muted small">${esc(W.catName(i.cat))} · ${esc(W.whName(i.wh))}${low?' · below reorder':''}</div>
+  </div>`;
+}).join('');
 W.item = id => W.ITEMS.find(i=>i.id===id) || {id,code:id,name:'(unknown item)',unit:'',qty:0,val:0};
 W.whName = w => (W.WAREHOUSES.find(x=>x.id===w)||{name:w}).name;
 W.catName = c => (W.CATS.find(x=>x.id===c)||{name:c}).name;
@@ -317,7 +331,9 @@ W.NAV = role => {
   };
   if (role === 'top_management') return {
     dashboard: {icon:'⊞', label:tnW('dashboard'), title:tnW('dashboard'), sub:tsW('dashboardTM'), group:tg('Overview')},
+    inventory: {icon:'📦', label:tnW('inventory'), title:tnW('inventory'), sub:tsW('inventory'), badge:low||'', group:tg('Warehouse')},
     requisitions: {icon:'📝', label:tnW('requisitions'), title:tnW('requisitions'), sub:tsW('requisitionsTM').replace('{n}',W.THRESHOLD.toLocaleString()), badge:awaitingHigh||'', group:tg('Warehouse')},
+    warehouses: {icon:'🏬', label:tnW('warehouses'), title:tnW('warehouses'), sub:tsW('warehouses'), group:tg('Warehouse')},
     budget: {icon:'💰', label:tnW('budget'), title:tnW('budget'), sub:tsW('budget'), group:tg('Resources')},
     reports: {icon:'📊', label:tnW('reports'), title:tnW('reports'), sub:tsW('reports'), group:tg('Insight')}
   };
@@ -391,6 +407,7 @@ W.renderDashboard = () => {
   const released = W.REQS.filter(r=>r.status==='RELEASED').length;
   const totalValue = W.ITEMS.reduce((s,i)=>s+i.qty*i.val,0);
   const held = W.RECEIPTS.filter(r=>r.status==='HELD');
+  const canExport = hasPermFlag(activeUser,'reports');
   $('view').innerHTML = `${W.dayStripHTML()}
   <div class="grid kpi-grid" style="margin:16px 0 20px">
   ${W.kpi('Stock value',(totalValue/1e6).toFixed(2)+'M','MZN across '+W.WAREHOUSES.length+' stores', '', '', "switchView('inventory')")}
@@ -399,14 +416,52 @@ W.renderDashboard = () => {
   ${W.kpi('Released', released, 'Requisitions fulfilled', 'good', '', "switchView('requisitions')")}
   </div>
   ${held.length ? `<div class="note bad" style="margin-bottom:16px"><b>${held.length} container held under WH-SOP-02.</b> ${esc(held[0].containerNo)} — survey and claim in progress.</div>` : ''}
+  ${canExport ? `<div class="row" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px"><button class="action-btn compact" onclick="W.exportDashboardPDF()">⭳ Download PDF</button><button class="action-btn compact" onclick="W.exportDashboardExcel()">⭳ Download Excel</button></div>` : ''}
   <div class="grid two-col">
   <div class="card"><div class="card-header"><div><h3>Warehouse locations</h3><p>Stock health across ${W.WAREHOUSES.length} stores</p></div></div>${W.facilityMapHTML()}
     <div class="table-wrap"><table class="data-table"><thead><tr><th>Store</th><th>SKUs</th><th>Below reorder</th><th>Value (MZN)</th></tr></thead><tbody>${W.WAREHOUSES.map(w=>{const st=W.whStats(w.id);return `<tr><td><strong>${esc(w.name)}</strong><br><small>${esc(w.loc)}</small></td><td>${st.count}</td><td class="${st.low?'danger':''}">${st.low}</td><td>${st.value.toLocaleString()}</td></tr>`;}).join('')}</tbody></table></div>
   </div>
-  <div class="card"><div class="card-header"><div><h3>Low stock</h3><p>Below minimum threshold</p></div></div><div class="activity-list">${low.length?low.map(i=>`<div class="activity-item"><div class="activity-dot" style="background:var(--red)"></div><div><strong>${esc(i.name)}</strong><span>${i.qty} ${esc(i.unit)} left · reorder at ${i.reorder} · ${esc(W.whName(i.wh))}</span></div></div>`).join(''):'<div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><strong>All items above reorder level</strong></div></div>'}</div></div>
+  <div class="card"><div class="card-header"><div><h3>Key relief item stock levels</h3><p>Main products — click any item for full detail</p></div><button class="text-btn" onclick="switchView('inventory')">Full inventory</button></div><div class="stocklevel-list">${W.keyStockHTML()}</div></div>
   </div>
-  <div class="card" style="margin-top:18px"><div class="card-header"><div><h3>Requisition pipeline</h3><p>Live status across the SOP chain</p></div><button class="text-btn" onclick="switchView('requisitions')">Open requisitions</button></div><div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Item(s)</th><th>Dept</th><th>Value (MZN)</th><th>Status</th></tr></thead><tbody>${W.REQS.slice(0,8).map(r=>`<tr><td><strong>${esc(r.id)}</strong></td><td>${r.lines.map(l=>esc(W.item(l.itemId).name)).join(', ')}</td><td>${esc(r.dept)}</td><td>${r.value.toLocaleString()}</td><td>${W.statusTag(r.status)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  <div class="grid two-col" style="margin-top:18px">
+  <div class="card"><div class="card-header"><div><h3>Low stock</h3><p>Below minimum threshold</p></div></div><div class="activity-list">${low.length?low.map(i=>`<div class="activity-item"><div class="activity-dot" style="background:var(--red)"></div><div><strong>${esc(i.name)}</strong><span>${i.qty} ${esc(i.unit)} left · reorder at ${i.reorder} · ${esc(W.whName(i.wh))}</span></div></div>`).join(''):'<div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><strong>All items above reorder level</strong></div></div>'}</div></div>
+  <div class="card"><div class="card-header"><div><h3>Requisition pipeline</h3><p>Live status across the SOP chain</p></div><button class="text-btn" onclick="switchView('requisitions')">Open requisitions</button></div><div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Item(s)</th><th>Dept</th><th>Value (MZN)</th><th>Status</th></tr></thead><tbody>${W.REQS.slice(0,8).map(r=>`<tr><td><strong>${esc(r.id)}</strong></td><td>${r.lines.map(l=>esc(W.item(l.itemId).name)).join(', ')}</td><td>${esc(r.dept)}</td><td>${r.value.toLocaleString()}</td><td>${W.statusTag(r.status)}</td></tr>`).join('')}</tbody></table></div></div>
+  </div>`;
   W.initFacilityMap();
+};
+
+/* ---- report exports — Top Management (and anyone with the "reports" permission)
+   can download the current warehouse picture without asking Logistics for a copy. ---- */
+W.exportDashboardExcel = () => {
+  exportExcel('warehouse-dashboard', 'Warehouse & Procurement — Dashboard Export', [
+    { heading:'Warehouses', headers:['Store','Location','SKUs','Below reorder','Value (MZN)'],
+      rows: W.WAREHOUSES.map(w => { const st=W.whStats(w.id); return [w.name, w.loc, st.count, st.low, st.value]; }) },
+    { heading:'Key relief item stock levels', headers:['Item','Category','Store','On hand','Unit','Reorder level'],
+      rows: W.KEY_ITEMS.map(id => { const i=W.item(id); return [i.name, W.catName(i.cat), W.whName(i.wh), i.qty, i.unit, i.reorder]; }) },
+    { heading:'Items below reorder level', headers:['Code','Item','Store','On hand','Reorder level'],
+      rows: W.ITEMS.filter(i=>i.qty<i.reorder).map(i => [i.code, i.name, W.whName(i.wh), i.qty, i.reorder]) },
+    { heading:'Requisition pipeline', headers:['Reference','Department','Items','Value (MZN)','Status'],
+      rows: W.REQS.map(r => [r.id, r.dept, r.lines.map(l=>W.item(l.itemId).name).join(', '), r.value, W.STATUS_META[r.status].label]) }
+  ]);
+};
+W.exportDashboardPDF = () => {
+  const low = W.ITEMS.filter(i=>i.qty<i.reorder);
+  const totalValue = W.ITEMS.reduce((s,i)=>s+i.qty*i.val,0);
+  exportPDF('warehouse-dashboard', 'Warehouse & Procurement — Dashboard Report', 'Tzu Chi Moz LMS · '+fmtDT(new Date()), [
+    { heading:'Overview', kv:[
+      ['Total stock value', money(totalValue)],
+      ['Stores', W.WAREHOUSES.length],
+      ['Items below reorder', low.length],
+      ['Requisitions awaiting action', W.REQS.filter(r=>['SUBMITTED','VERIFIED'].includes(r.status)).length],
+      ['Requisitions released', W.REQS.filter(r=>r.status==='RELEASED').length]
+    ]},
+    { heading:'Warehouses', table:{ headers:['Store','Location','SKUs','Below reorder','Value (MZN)'],
+      rows: W.WAREHOUSES.map(w => { const st=W.whStats(w.id); return [w.name, w.loc, st.count, st.low, nf(st.value)]; }) } },
+    { heading:'Key relief item stock levels', table:{ headers:['Item','Category','Store','On hand','Reorder level'],
+      rows: W.KEY_ITEMS.map(id => { const i=W.item(id); return [i.name, W.catName(i.cat), W.whName(i.wh), nf(i.qty)+' '+i.unit, nf(i.reorder)]; }) } },
+    { heading:'Requisition pipeline', table:{ headers:['Reference','Department','Value (MZN)','Status'],
+      rows: W.REQS.map(r => [r.id, r.dept, nf(r.value), W.STATUS_META[r.status].label]) } }
+  ]);
 };
 
 /* ============================================================ CONTROL TOWER */

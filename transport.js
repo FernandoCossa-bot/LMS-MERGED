@@ -239,6 +239,9 @@ T.showBreakdownsOpen = () => {
     list.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Reference</th><th>Vehicle</th><th>Phase</th><th></th></tr></thead><tbody>${list.map(b=>`<tr><td><strong>${esc(b.id)}</strong></td><td class="small">${esc(b.vehicle)}</td><td><span class="tag t-blue">${esc(b.phase)}</span></td><td><button class="action-btn compact" onclick="closeDrawer();switchView('maintenance')">Open</button></td></tr>`).join('')}</tbody></table></div>`
     : T.emptyState('No breakdowns open',''));
 };
+T.showFleetBreakdown = () => {
+  showDrawer('Fleet', 'Fleet status breakdown', `<div class="table-wrap"><table class="data-table"><thead><tr><th>Plate</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Fuel</th></tr></thead><tbody>${T.VEHICLES.map(v=>`<tr><td><strong>${esc(v.plate)}</strong></td><td class="small">${esc(v.name)}</td><td class="small">${esc(v.driver||'—')}</td><td>${T.statusTag(v.status)}</td><td class="small">${v.fuel}%</td></tr>`).join('')}</tbody></table></div>`);
+};
 T.showDriverAlerts = () => {
   const items = [];
   T.VEHICLES.filter(v=>v.status==='alert').forEach(v=>items.push({label:v.plate+' low fuel', detail:v.fuel+'% remaining · '+v.location}));
@@ -365,18 +368,63 @@ T.renderCoordDash = () => {
   T.initFleetMap();
 };
 T.renderExecDash = () => {
-  const active = T.VEHICLES.filter(v=>v.status==='active').length, pending = T.REQUESTS.filter(r=>r.status==='pending').length;
+  const active = T.VEHICLES.filter(v=>v.status==='active').length, alert = T.VEHICLES.filter(v=>v.status==='alert').length, offline = T.VEHICLES.filter(v=>v.status==='offline').length;
+  const pending = T.REQUESTS.filter(r=>r.status==='pending').length;
   const pct = Math.round((active/T.VEHICLES.length)*100);
+  const canExport = hasPermFlag(activeUser,'reports');
+  const reqByStatus = ['pending','approved','assigned','in-progress','completed'].map(s => [s, T.REQUESTS.filter(r=>r.status===s).length]);
+  const restWarn = T.DRIVER_ATTENDANCE.filter(d=>d.rest<11);
   $('view').innerHTML = `<div class="grid kpi-grid" style="margin-bottom:20px">
-  ${T.kpi('Fleet readiness', pct+'%', active+' of '+T.VEHICLES.length+' vehicles', 'good')}
+  ${T.kpi('Fleet readiness', pct+'%', active+' of '+T.VEHICLES.length+' vehicles', 'good', '', "T.showFleetBreakdown()")}
   ${T.kpi('On-time missions', '92%', '+4% vs. prior month', 'good')}
   ${T.kpi('Open requests', pending, 'Awaiting scheduling', pending?'warn':'')}
-  ${T.kpi('Hire above threshold', T.HIRE_REQUESTS.filter(h=>T.canApproveHire(h)).length, 'Awaiting your sign-off', 'warn')}
+  ${T.kpi('Hire above threshold', T.HIRE_REQUESTS.filter(h=>T.canApproveHire(h)).length, 'Awaiting your sign-off', 'warn', '', "switchView('budget')")}
   </div>
+  ${canExport ? `<div class="row" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px"><button class="action-btn compact" onclick="T.exportDashboardPDF()">⭳ Download PDF</button><button class="action-btn compact" onclick="T.exportDashboardExcel()">⭳ Download Excel</button></div>` : ''}
   <div class="grid two-col"><div class="card"><div class="card-header"><div><h3>Fleet operating picture</h3><p>Executive view — Sofala Province</p></div></div>${T.fleetMapHTML()}</div>
   <div class="card"><div class="card-header"><div><h3>Decision signals</h3><p>Items requiring attention</p></div></div><div class="activity-list">${T.exceptions().slice(0,6).map(e=>`<div class="activity-item"><div class="activity-dot" style="background:${e.sev==='Critical'?'var(--red)':'var(--amber)'}"></div><div><strong>${esc(e.area)}</strong><span>${esc(e.what)}</span></div></div>`).join('')}</div><div style="padding:16px 20px"><button class="primary-btn compact" onclick="switchView('budget')">Review finance approvals</button></div></div></div>
-  <div class="role-note">Top Management has read-only executive dashboard access plus finance and high-value hire approvals. Operational records are managed by the Logistics Department.</div>`;
+  <div class="grid two-col" style="margin-top:18px">
+  <div class="card"><div class="card-header"><div><h3>Fleet composition</h3><p>${T.VEHICLES.length} vehicles department-wide</p></div></div>
+  <div class="table-wrap"><table class="data-table"><thead><tr><th>Plate</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Fuel</th><th>Odometer</th></tr></thead><tbody>${T.VEHICLES.map(v=>`<tr><td><strong>${esc(v.plate)}</strong></td><td class="small">${esc(v.name)}</td><td class="small">${esc(v.driver||'—')}</td><td>${T.statusTag(v.status)}</td><td class="small">${v.fuel}%</td><td class="small">${nf(v.km)} km</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card"><div class="card-header"><div><h3>Requests by stage</h3><p>Whole pipeline, this dataset</p></div></div><div class="card-body">${reqByStatus.map(([s,n])=>{const max=Math.max(1,...reqByStatus.map(r=>r[1]));return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span style="text-transform:capitalize">${esc(s)}</span><span class="muted">${n}</span></div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%"></div></div></div>`;}).join('')}</div>
+  <div class="card-header" style="border-top:1px solid var(--line)"><div><h3>Driver rest compliance</h3><p>Minimum 11h rest — SOP §People</p></div></div>
+  <div class="activity-list">${restWarn.length?restWarn.map(d=>`<div class="activity-item"><div class="activity-dot" style="background:var(--red)"></div><div><strong>${esc(d.name)}</strong><span>${d.rest}h rest — below the 11h minimum</span></div></div>`).join(''):'<div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><strong>All drivers within rest limits</strong></div></div>'}</div>
+  </div>
+  </div>
+  <div class="role-note" style="margin-top:14px">Top Management has read-only visibility into fleet, requests and driver compliance, plus finance and high-value hire approvals above ${T.THRESHOLD?nf(T.THRESHOLD):'50,000'} MZN. Operational records are managed by the Logistics Department.</div>`;
   T.initFleetMap();
+};
+
+/* ---- report exports — mirrors the warehouse module's, so Top Management can pull a
+   snapshot of Transportation without needing Logistics to compile one. ---- */
+T.exportDashboardExcel = () => {
+  exportExcel('transportation-dashboard', 'Transportation — Dashboard Export', [
+    { heading:'Fleet', headers:['Plate','Vehicle','Driver','Status','Fuel %','Odometer (km)','Location'],
+      rows: T.VEHICLES.map(v => [v.plate, v.name, v.driver||'—', v.status, v.fuel, v.km, v.location]) },
+    { heading:'Transport requests', headers:['ID','Requester','Department','Route','Status','Driver','Vehicle'],
+      rows: T.REQUESTS.map(r => [r.id, r.requester, r.department, r.origin+' → '+r.destination, r.status, r.driver||'—', r.vehicle||'—']) },
+    { heading:'Driver rest compliance', headers:['Driver','Days worked','Days off','Rest hours','Phone'],
+      rows: T.DRIVER_ATTENDANCE.map(d => [d.name, d.days, d.off, d.rest, d.phone]) },
+    { heading:'Hire requests', headers:['ID','Department','Purpose','Selected supplier','Total (MZN)','Status'],
+      rows: T.HIRE_REQUESTS.map(h => [h.id, h.dept, h.purpose, h.selected, h.total, h.status]) }
+  ]);
+};
+T.exportDashboardPDF = () => {
+  const active = T.VEHICLES.filter(v=>v.status==='active').length;
+  exportPDF('transportation-dashboard', 'Transportation — Dashboard Report', 'Tzu Chi Moz LMS · '+fmtDT(new Date()), [
+    { heading:'Overview', kv:[
+      ['Fleet readiness', active+' of '+T.VEHICLES.length+' vehicles active'],
+      ['Open requests', T.REQUESTS.filter(r=>r.status==='pending').length],
+      ['Hire requests awaiting sign-off', T.HIRE_REQUESTS.filter(h=>T.canApproveHire(h)).length],
+      ['Drivers below rest minimum', T.DRIVER_ATTENDANCE.filter(d=>d.rest<11).length]
+    ]},
+    { heading:'Fleet', table:{ headers:['Plate','Vehicle','Driver','Status','Fuel','Odometer'],
+      rows: T.VEHICLES.map(v => [v.plate, v.name, v.driver||'—', v.status, v.fuel+'%', nf(v.km)+' km']) } },
+    { heading:'Transport requests', table:{ headers:['ID','Department','Route','Status'],
+      rows: T.REQUESTS.map(r => [r.id, r.department, r.origin+' → '+r.destination, r.status]) } },
+    { heading:'Driver rest compliance', table:{ headers:['Driver','Days worked','Days off','Rest hours'],
+      rows: T.DRIVER_ATTENDANCE.map(d => [d.name, d.days, d.off, d.rest+'h']) } }
+  ]);
 };
 
 /* ============================================================ CONTROL TOWER */

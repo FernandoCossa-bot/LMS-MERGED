@@ -264,6 +264,53 @@ function audit(action, entity, detail){
 }
 window.AUDIT = AUDIT; window.audit = audit;
 
+/* ---- REPORT EXPORTS (PDF / Excel) — shared by both modules, used from the
+   Top Management dashboards and Reports screens. No server involved: Excel is
+   an HTML table served with an .xls mime type (Excel opens this natively and
+   keeps headers/formatting), PDF is built client-side with jsPDF + autotable. ---- */
+function downloadBlob(filename, content, mime){
+  const blob = new Blob([content], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function exportExcel(filename, title, sections){
+  // sections: [{ heading, headers:[...], rows:[[...]] }]
+  const style = `<style>body{font-family:Calibri,Arial,sans-serif} h2,h3{color:#0b2038} table{border-collapse:collapse;margin-bottom:22px} th,td{border:1px solid #b9c4cf;padding:4px 9px;font-size:12px;white-space:nowrap} th{background:#0b2038;color:#fff;text-align:left}</style>`;
+  const body = sections.map(sec => `<h3>${esc(sec.heading)}</h3><table><tr>${sec.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${sec.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(String(c ?? ''))}</td>`).join('')}</tr>`).join('')}</table>`).join('');
+  const html = `<html><head><meta charset="UTF-8">${style}</head><body><h2>${esc(title)}</h2><p>${esc(fmtDT(new Date()))} · Tzu Chi Moz LMS</p>${body}</body></html>`;
+  downloadBlob(filename.endsWith('.xls') ? filename : filename+'.xls', html, 'application/vnd.ms-excel');
+  toast('Excel file downloaded', filename);
+}
+function exportPDF(filename, title, subtitle, sections){
+  // sections: [{ heading, kv:[[label,value],...] }, { heading, table:{headers,rows} }]
+  if (!window.jspdf) { toast('PDF unavailable', 'The PDF library did not load — check your connection and try again.', 'danger'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageH = doc.internal.pageSize.getHeight();
+  let y = 18;
+  doc.setFontSize(16); doc.setTextColor(11,32,56); doc.text(title, 14, y); y += 7;
+  doc.setFontSize(10); doc.setTextColor(120); doc.text(subtitle || fmtDT(new Date()), 14, y); doc.setTextColor(20); y += 10;
+  sections.forEach(sec => {
+    if (y > pageH-30) { doc.addPage(); y = 18; }
+    doc.setFontSize(12); doc.setTextColor(11,32,56); doc.text(sec.heading, 14, y); doc.setTextColor(20); y += 6;
+    if (sec.kv) {
+      doc.setFontSize(9);
+      sec.kv.forEach(([k,v]) => { if (y > pageH-16) { doc.addPage(); y = 18; } doc.text(`${k}: ${v}`, 16, y); y += 5; });
+      y += 4;
+    }
+    if (sec.table && doc.autoTable) {
+      doc.autoTable({ startY:y, head:[sec.table.headers], body:sec.table.rows, styles:{fontSize:8}, headStyles:{fillColor:[11,32,56]}, margin:{left:14,right:14} });
+      y = doc.lastAutoTable.finalY + 10;
+    }
+  });
+  doc.save(filename.endsWith('.pdf') ? filename : filename+'.pdf');
+  toast('PDF downloaded', filename);
+}
+window.downloadBlob = downloadBlob; window.exportExcel = exportExcel; window.exportPDF = exportPDF;
+
 /* ---- date/number formatting shared by both modules ---- */
 const nf = n => Number(n||0).toLocaleString('en-GB');
 const money = n => 'MT ' + Number(n||0).toLocaleString('en-GB',{maximumFractionDigits:0});

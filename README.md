@@ -2,6 +2,12 @@
 
 This folder merges the two standalone prototypes (`Transportation System/` and `WAREHOUSE SYSTEM/`) into one system with a single login and a shared role model. It's a client-side demo (in-memory data, no backend) — the same status as the two source prototypes.
 
+## v1.5 — richer Top Management dashboards, PDF/Excel report downloads
+
+- **Top Management now gets a genuinely detailed picture of both departments**, not just headline KPIs. Transportation's executive dashboard adds a full fleet composition table (plate, vehicle, driver, status, fuel, odometer), a requests-by-stage breakdown chart and driver rest-compliance visibility — the same depth of detail Logistics sees, still read-only.
+- **Warehouse now gives Top Management the Inventory and Warehouses screens** (previously Logistics-only), plus a new "Key relief item stock levels" panel on the dashboard showing on-hand quantity for the main relief products — rice, tarpaulins, blankets, mosquito nets, hygiene kits, first aid kits, school kits, pallets — each with a progress bar against reorder level, so anyone landing on the dashboard sees what's actually in stock, not just an aggregate MZN value.
+- **Download reports as PDF or Excel.** Both modules' dashboards (visible to anyone holding the "View Dashboards & Reports" permission — Top Management, Logistics and Administrators by default) now have Download PDF / Download Excel buttons. Excel export is a real `.xls` workbook (multi-sheet-style sectioned tables); PDF export is generated client-side with jsPDF + autotable — no server round-trip, no data leaves the browser.
+
 ## v1.4 — driver leave, real per-user permissions, multi-language, AI assistants
 
 - **Driver leave requests.** Drivers submit a leave request (type, dates, reason) from My Tasks and see their own history there; the Logistics Department reviews and approves/rejects from Driver Compliance. Demo data covers pending, approved and rejected cases across several drivers. (Marking missions complete already existed via the trip logbook flow — "Complete trip" on each task card.)
