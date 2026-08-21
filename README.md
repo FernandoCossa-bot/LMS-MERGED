@@ -2,6 +2,10 @@
 
 This folder merges the two standalone prototypes (`Transportation System/` and `WAREHOUSE SYSTEM/`) into one system with a single login and a shared role model. It's a client-side demo (in-memory data, no backend) — the same status as the two source prototypes.
 
+## v1.8 — mobile sidebar is now a proper off-canvas drawer
+
+- The v1.6 fix squeezed the sidebar into a horizontal scroll strip above the content on narrow screens, which wasn't a real fix — the sidebar effectively disappeared/became unusable on a phone. Replaced it with a standard mobile pattern: a hamburger button in the topbar opens the full sidebar as a slide-in overlay drawer (with a dismiss backdrop and an X to close), matching how the rest of the app already handles drawers. Picking a nav item closes the drawer automatically. Desktop is unaffected — the sidebar stays permanently docked there.
+
 ## v1.7 — decision-oriented executive dashboard for Top Management
 
 - Top Management still holds the exact same permissions and sidebar as the Logistics Department (unchanged from v1.6), but what they land on at Dashboard is now a distinct, decision-focused view instead of the operational one Logistics sees — the same shift-by-shift "Fleet active / Active missions" style numbers don't help someone deciding budget or approvals.

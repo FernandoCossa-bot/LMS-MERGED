@@ -74,10 +74,12 @@
 
 <!-- ============ MODULE APP SHELL ============ -->
 <div id="app" class="app hidden">
+  <div class="sidebar-bg" id="sidebar-bg"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <button class="brand-mark small as-btn" id="back-to-hub" title="Back to hub"><img src="tzu-chi-logo.jpg" alt="Tzu Chi Moçambique"></button>
       <div class="sidebar-brand-text"><strong id="module-name">—</strong><span>Tzu Chi Moz LMS</span></div>
+      <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">&#x00D7;</button>
     </div>
     <button class="hub-return-btn" id="hub-return-btn" data-i18n="common.allModules">&#8592; All modules</button>
     <nav id="sidebar-nav"></nav>
@@ -92,6 +94,7 @@
   </aside>
   <main class="main-content">
     <header class="topbar">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
       <div class="topbar-left">
         <p class="eyebrow blue" id="page-eyebrow">Operations overview</p>
         <h2 class="page-title" id="page-title">Dashboard</h2>

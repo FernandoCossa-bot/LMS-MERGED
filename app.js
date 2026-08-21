@@ -411,8 +411,19 @@ function renderHub(){
   $('app').classList.add('hidden');
   $('hub-screen').classList.remove('hidden');
 }
-$('hub-return-btn').onclick = () => { $('app').classList.add('hidden'); $('ai-fab').classList.add('hidden'); aiOpen(false); renderHub(); };
-$('back-to-hub').onclick = () => { if (activeUser.role !== 'driver') { $('app').classList.add('hidden'); $('ai-fab').classList.add('hidden'); aiOpen(false); renderHub(); } };
+$('hub-return-btn').onclick = () => { closeSidebar(); $('app').classList.add('hidden'); $('ai-fab').classList.add('hidden'); aiOpen(false); renderHub(); };
+$('back-to-hub').onclick = () => { if (activeUser.role !== 'driver') { closeSidebar(); $('app').classList.add('hidden'); $('ai-fab').classList.add('hidden'); aiOpen(false); renderHub(); } };
+
+/* ---- MOBILE SIDEBAR — on narrow screens the sidebar is an off-canvas drawer,
+   opened from the topbar hamburger and dismissed via the X, the backdrop, or by
+   picking a nav item (same drawer pattern used elsewhere in the app). On desktop
+   the sidebar is already permanently visible, so these are no-ops there. ---- */
+function openSidebar(){ $('sidebar').classList.add('open'); $('sidebar-bg').classList.add('on'); }
+function closeSidebar(){ $('sidebar').classList.remove('open'); $('sidebar-bg').classList.remove('on'); }
+$('sidebar-toggle').onclick = openSidebar;
+$('sidebar-close').onclick = closeSidebar;
+$('sidebar-bg').onclick = closeSidebar;
+window.closeSidebar = closeSidebar;
 
 /* ============================================================ MODULE SHELL */
 const MODULE_META = {
@@ -446,7 +457,7 @@ function renderSidebarNav(){
     html += `<button class="nav-item${key===state.view?' active':''}" data-view="${key}"><span class="nav-icon">${meta.icon}</span>${meta.label}${meta.badge?`<span class="nav-badge">${meta.badge}</span>`:''}</button>`;
   });
   $('sidebar-nav').innerHTML = html;
-  document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => switchView(b.dataset.view));
+  document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => { switchView(b.dataset.view); closeSidebar(); });
 }
 
 /* ---- QUICK SEARCH — filters rows of the data-table in the current view ---- */
