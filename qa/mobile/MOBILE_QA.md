@@ -41,6 +41,23 @@ drawer without breaking the fixed header/footer.
 scrolls as expected at phone width. Desktop layout (sidebar permanently docked) is
 untouched — this only changes behaviour under the 760px breakpoint.
 
+## 4. Modal-over-map stacking bug
+
+Separately reported: any modal opened over a screen containing a live Leaflet map
+(e.g. "Request transportation" over the Coordinator dashboard's fleet map) had the
+map's tiles and zoom controls bleeding through on top of the modal instead of
+staying behind it. Root cause: Leaflet's internal panes use z-index up to 700
+(popups), and `.map-wrap` had no CSS stacking context of its own, so those values
+competed directly against the modal's z-index (20) at the page's root stacking
+context instead of being contained within the map's own box.
+
+Fix: `isolation: isolate` added to `.map-wrap` (styles.css) — traps all of Leaflet's
+internal z-index values inside the map's own stacking context. Applies to every map
+in the app, both modules, since `.map-wrap` is the one shared container class
+(`T.fleetMapHTML`, `W.facilityMapHTML`).
+
+![Modal correctly on top of the map](04-modal-over-map-fixed.png)
+
 ## How to re-run this check
 
 From `TZU CHI MOZ LMS V2/`:

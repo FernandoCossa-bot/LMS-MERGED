@@ -233,7 +233,11 @@ tr[onclick] { transition: background-color var(--transition); }
 .status.active { color: #08785b; background: #e7f8f1; }
 .status.offline { color: #566377; background: #eef1f5; }
 .status.alert { color: #a33131; background: #fdeaea; }
-.map-wrap { position: relative; height: 420px; background: #d4e6e8; border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; }
+/* isolation:isolate traps Leaflet's internal pane z-indexes (up to 700 for popups)
+   inside this box's own stacking context. Without it, a map's panes/controls can
+   out-rank page-level z-index values they were never meant to compete with — e.g.
+   a dashboard map rendering on top of a modal (z-index 20) opened over it. */
+.map-wrap { position: relative; height: 420px; background: #d4e6e8; border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; isolation: isolate; }
 .map-wrap iframe { width: 100%; height: 100%; border: 0; filter: saturate(.78) contrast(.92); }
 .map-wrap .leaflet-map { width: 100%; height: 100%; }
 .leaflet-pin { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; color: #fff; box-shadow: 0 4px 12px rgba(10,41,74,.35); font-size: 12px; cursor: pointer; }
