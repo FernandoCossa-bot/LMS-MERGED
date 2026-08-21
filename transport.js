@@ -333,7 +333,53 @@ T.render = view => {
 T.renderDashboard = () => {
   const role = activeUser.role;
   if (role === 'coordinator') return T.renderCoordDash();
+  if (role === 'top_management') return T.renderExecDash();
   return T.renderManagerDash();
+};
+/* ---- department demand — which departments actually draw on the fleet, used by
+   the executive dashboard to inform resourcing decisions. ---- */
+T.chartDepts = () => { const map={}; T.REQUESTS.forEach(r=>{map[r.department]=(map[r.department]||0)+1;}); const rows=Object.entries(map).sort((a,b)=>b[1]-a[1]); const max=Math.max(1,...rows.map(r=>r[1]));
+  return rows.map(([d,n])=>`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span>${esc(d)}</span><span class="muted">${n}</span></div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%"></div></div></div>`).join('') || '<div class="muted small">No requests yet.</div>'; };
+/* ---- Executive dashboard — Top Management holds the same permissions as the
+   Logistics Department (same nav, same actions), but what they land on is built
+   around decisions, not shift-by-shift operations: money committed, what's
+   waiting on their sign-off, where demand is concentrated, and where the risk
+   sits — not a live count of which vehicles are on the road right now. ---- */
+T.renderExecDash = () => {
+  const pendingFinance = T.FINANCE.filter(f=>f.status==='pending');
+  const pendingHire = T.HIRE_REQUESTS.filter(h=>h.status==='pending_approval');
+  const approvalsCount = pendingFinance.length + pendingHire.length;
+  const spend = {
+    Fuel: T.FINANCE.filter(f=>f.category==='Fuel' && f.status==='approved').reduce((s,f)=>s+f.amount,0),
+    Maintenance: T.SERVICE_LOG.reduce((s,m)=>s+m.cost,0) + T.BREAKDOWNS.reduce((s,b)=>s+(b.cost||0),0),
+    Hire: T.HIRE_REQUESTS.filter(h=>h.status==='approved').reduce((s,h)=>s+h.total+(h.toll||0),0)
+  };
+  const totalSpend = Object.values(spend).reduce((a,b)=>a+b,0);
+  const closed = T.REQUESTS.filter(r=>['completed','cancelled'].includes(r.status)).length;
+  const completed = T.REQUESTS.filter(r=>r.status==='completed').length;
+  const serviceLevel = closed ? Math.round(completed/closed*100) : 100;
+  const x = T.exceptions();
+  const risk = x.filter(e=>e.sev==='Critical').length + x.filter(e=>e.sev==='High').length;
+  const canExport = hasPermFlag(activeUser,'reports');
+  const approvalRows = [
+    ...pendingFinance.map(f => ({ ref:f.id, what:f.description, dept:f.dept, amount:f.amount, action:`T.approveReq('${f.id}')`, reject:`T.rejectReq('${f.id}')` })),
+    ...pendingHire.map(h => ({ ref:h.id, what:h.purpose, dept:h.dept, amount:h.total+(h.toll||0), action:`T.approveHire('${h.id}')`, reject:`T.rejectHire('${h.id}')` }))
+  ];
+  $('view').innerHTML = `<div class="grid kpi-grid" style="margin-bottom:20px">
+  ${T.kpi('Awaiting your sign-off', approvalsCount, approvalsCount?'Requires a decision':'Nothing pending', approvalsCount?'warn':'good', '', "switchView('budget')")}
+  ${T.kpi('Committed spend', (totalSpend/1000).toFixed(0)+'k', 'Fuel, maintenance & hire · MZN', '', '', "switchView('budget')")}
+  ${T.kpi('Service level', serviceLevel+'%', completed+' of '+closed+' missions completed', serviceLevel>=85?'good':'warn')}
+  ${T.kpi('Risk exposure', risk, 'Critical + high-priority issues', risk?'bad':'good', '', "switchView('tower')")}
+  </div>
+  ${canExport ? `<div class="row" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px"><button class="action-btn compact" onclick="T.exportDashboardPDF()">⭳ Download PDF</button><button class="action-btn compact" onclick="T.exportDashboardExcel()">⭳ Download Excel</button></div>` : ''}
+  <div class="card" style="margin-bottom:18px"><div class="card-header"><div><h3>Awaiting your sign-off</h3><p>Finance requisitions and hire requests, oldest first</p></div><button class="text-btn" onclick="switchView('budget')">Open Finance &amp; Approvals</button></div>
+  <div class="table-wrap">${approvalRows.length ? `<table class="data-table"><thead><tr><th>Reference</th><th>What</th><th>Department</th><th>Amount (MZN)</th><th></th></tr></thead><tbody>${approvalRows.map(r=>`<tr><td><strong>${esc(r.ref)}</strong></td><td class="small" style="max-width:260px">${esc(r.what)}</td><td class="small">${esc(r.dept)}</td><td>${nf(r.amount)}${r.amount>T.THRESHOLD?' <span class="tag t-sand">high value</span>':''}</td><td style="white-space:nowrap"><button class="action-btn success" onclick="${r.action}">Approve</button> <button class="action-btn danger" onclick="${r.reject}">Reject</button></td></tr>`).join('')}</tbody></table>` : T.emptyState('Nothing awaiting sign-off','')}</div></div>
+  <div class="grid two-col">
+  <div class="card"><div class="card-header"><div><h3>Committed spend by category</h3><p>Approved fuel, maintenance and hire costs</p></div></div><div class="card-body">${Object.entries(spend).map(([k,v])=>{const max=Math.max(1,...Object.values(spend));return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span>${esc(k)}</span><span class="muted">${money(v)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${v/max*100}%"></div></div></div>`;}).join('')}</div></div>
+  <div class="card"><div class="card-header"><div><h3>Demand by department</h3><p>Who is drawing on the fleet</p></div></div><div class="card-body">${T.chartDepts()}</div></div>
+  </div>
+  <div class="card" style="margin-top:18px"><div class="card-header"><div><h3>Risk &amp; compliance signals</h3><p>What could stop operations or trigger liability</p></div><button class="text-btn" onclick="switchView('tower')">Open Control Tower</button></div>
+  <div class="activity-list">${x.slice(0,6).length?x.slice(0,6).map(e=>`<div class="activity-item"><div class="activity-dot" style="background:${e.sev==='Critical'?'var(--red)':e.sev==='High'?'var(--amber)':'var(--muted)'}"></div><div><strong>${esc(e.area)}</strong><span>${esc(e.what)}</span></div></div>`).join(''):'<div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><strong>Nothing outstanding</strong></div></div>'}</div></div>`;
 };
 T.renderManagerDash = () => {
   const active = T.VEHICLES.filter(v=>v.status==='active').length, alerts = T.VEHICLES.filter(v=>v.status==='alert').length;

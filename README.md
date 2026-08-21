@@ -2,6 +2,13 @@
 
 This folder merges the two standalone prototypes (`Transportation System/` and `WAREHOUSE SYSTEM/`) into one system with a single login and a shared role model. It's a client-side demo (in-memory data, no backend) — the same status as the two source prototypes.
 
+## v1.7 — decision-oriented executive dashboard for Top Management
+
+- Top Management still holds the exact same permissions and sidebar as the Logistics Department (unchanged from v1.6), but what they land on at Dashboard is now a distinct, decision-focused view instead of the operational one Logistics sees — the same shift-by-shift "Fleet active / Active missions" style numbers don't help someone deciding budget or approvals.
+- **Transportation executive dashboard**: KPIs are now Awaiting your sign-off, Committed spend (fuel/maintenance/hire), Service level and Risk exposure. Below that: a direct Approve/Reject table for pending Finance requisitions and hire requests, committed spend by category, demand by department, and a condensed risk & compliance feed.
+- **Warehouse executive dashboard**: KPIs are now Awaiting your sign-off (high-value requisitions), Budget used, Service level and Stock value at risk. Below that: a direct Authorise/Reject table for high-value requisitions, budget vs. actual by line, demand by department, the key relief item stock levels panel, and a condensed risk & compliance feed.
+- Logistics Department, Administrators and Coordinators are unaffected — they still get the original operational dashboards built around live fleet/stock status.
+
 ## v1.6 — Top Management now equal to Logistics Department, mobile layout fix
 
 - **Top Management holds the same permissions as the Logistics Department** in both modules — create, verify/approve, authorise high-value, release, receive, operate and reports/audit are now identical between the two roles, and both get the same full sidebar (Control Tower, Requisitions, Receiving, Movements, Fleet, Dispatch, Fuel, Maintenance, Hire, Compliance, Budget, SOP, etc.), not a cut-down read-only subset. Existing accounts pick this up automatically since permissions are computed from role defaults at load.

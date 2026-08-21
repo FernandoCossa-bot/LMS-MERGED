@@ -375,7 +375,7 @@ W.initFacilityMap = () => {
 /* ============================================================ RENDER ROUTER */
 W.render = view => {
   switch (view) {
-    case 'dashboard': return W.renderDashboard();
+    case 'dashboard': return activeUser.role==='top_management' ? W.renderExecDash() : W.renderDashboard();
     case 'tower': return W.renderTower();
     case 'inventory': return W.renderInventory();
     case 'receiving': return W.renderReceiving();
@@ -455,6 +455,43 @@ W.exportDashboardPDF = () => {
     { heading:'Requisition pipeline', table:{ headers:['Reference','Department','Value (MZN)','Status'],
       rows: W.REQS.map(r => [r.id, r.dept, nf(r.value), W.STATUS_META[r.status].label]) } }
   ]);
+};
+
+/* ============================================================ EXECUTIVE DASHBOARD
+   Top Management holds the same permissions as the Logistics Department (same nav,
+   same actions), but what they land on is built around decisions, not shift-by-shift
+   stock movements: money committed vs budget, what's waiting on their sign-off,
+   where demand is concentrated, and where stock risk sits. */
+W.renderExecDash = () => {
+  const period = W.today().slice(0,7); const m = W.monthLabour(period);
+  const bud = W.BUDGET.map(b=>b.line==='Warehouse labour'?Object.assign({},b,{actual:m.cost}):b);
+  const tb = bud.reduce((a,b)=>a+b.budget,0), ta = bud.reduce((a,b)=>a+b.actual,0);
+  const highValue = W.REQS.filter(r=>r.status==='VERIFIED' && r.value>W.THRESHOLD);
+  const low = W.ITEMS.filter(i=>i.qty<i.reorder);
+  const expiring = W.ITEMS.filter(i=>i.exp && daysUntil(i.exp)<=90 && daysUntil(i.exp)>=0);
+  const riskValue = low.reduce((s,i)=>s+i.qty*i.val,0) + expiring.reduce((s,i)=>s+i.qty*i.val,0);
+  const closed = W.REQS.filter(r=>['RELEASED','REJECTED'].includes(r.status)).length;
+  const released = W.REQS.filter(r=>r.status==='RELEASED').length;
+  const serviceLevel = closed ? Math.round(released/closed*100) : 100;
+  const x = W.exceptions();
+  const risk = x.filter(e=>e.sev==='Critical').length + x.filter(e=>e.sev==='High').length;
+  const canExport = hasPermFlag(activeUser,'reports');
+  $('view').innerHTML = `<div class="grid kpi-grid" style="margin:0 0 20px">
+  ${W.kpi('Awaiting your sign-off', highValue.length, highValue.length?'High-value requisitions':'Nothing pending', highValue.length?'warn':'good', '', "switchView('requisitions')")}
+  ${W.kpi('Budget used', tb?Math.round(ta/tb*100)+'%':'—', money(ta)+' of '+money(tb)+' this month', ta>tb?'bad':ta/tb>0.9?'warn':'good', '', "switchView('budget')")}
+  ${W.kpi('Service level', serviceLevel+'%', released+' of '+closed+' requisitions released', serviceLevel>=85?'good':'warn')}
+  ${W.kpi('Stock value at risk', (riskValue/1000).toFixed(0)+'k', low.length+' below reorder · '+expiring.length+' expiring soon', riskValue?'bad':'good', '', "switchView('inventory',{stock:'low'})")}
+  </div>
+  ${canExport ? `<div class="row" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px"><button class="action-btn compact" onclick="W.exportDashboardPDF()">⭳ Download PDF</button><button class="action-btn compact" onclick="W.exportDashboardExcel()">⭳ Download Excel</button></div>` : ''}
+  <div class="card" style="margin-bottom:18px"><div class="card-header"><div><h3>Awaiting your sign-off</h3><p>Requisitions above ${nf(W.THRESHOLD)} MZN, verified and ready to authorise</p></div><button class="text-btn" onclick="switchView('requisitions')">Open requisitions</button></div>
+  <div class="table-wrap">${highValue.length ? `<table class="data-table"><thead><tr><th>Reference</th><th>Purpose</th><th>Department</th><th>Value (MZN)</th><th></th></tr></thead><tbody>${highValue.map(r=>`<tr><td><strong>${esc(r.id)}</strong></td><td class="small" style="max-width:260px">${esc(r.purpose)}</td><td class="small">${esc(r.dept)}</td><td>${nf(r.value)} <span class="tag t-sand">high value</span></td><td style="white-space:nowrap"><button class="action-btn success" onclick="W.reqAction('${r.id}','authorize')">Authorise</button> <button class="action-btn danger" onclick="W.reqAction('${r.id}','reject')">Reject</button></td></tr>`).join('')}</tbody></table>` : W.emptyState('Nothing awaiting sign-off','')}</div></div>
+  <div class="grid two-col">
+  <div class="card"><div class="card-header"><div><h3>Budget vs actual — ${period}</h3><p>Operational budget by line</p></div></div><div class="card-body">${bud.map(b=>{const pct=b.budget?b.actual/b.budget*100:0;return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px"><span>${esc(b.line)}</span><span class="muted">${money(b.actual)} / ${money(b.budget)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,pct)}%;background:${pct>100?'var(--red)':pct>90?'var(--amber)':'var(--green)'}"></div></div></div>`;}).join('')}</div></div>
+  <div class="card"><div class="card-header"><div><h3>Demand by department</h3><p>Who is drawing on the warehouse</p></div></div><div class="card-body">${W.chartDepts()}</div></div>
+  </div>
+  <div class="card" style="margin-top:18px"><div class="card-header"><div><h3>Key relief item stock levels</h3><p>Main products — click any item for full detail</p></div><button class="text-btn" onclick="switchView('inventory')">Full inventory</button></div><div class="stocklevel-list">${W.keyStockHTML()}</div></div>
+  <div class="card" style="margin-top:18px"><div class="card-header"><div><h3>Risk &amp; compliance signals</h3><p>What could stop operations or trigger a claim</p></div><button class="text-btn" onclick="switchView('tower')">Open Control Tower</button></div>
+  <div class="activity-list">${x.slice(0,6).length?x.slice(0,6).map(e=>`<div class="activity-item"><div class="activity-dot" style="background:${e.sev==='Critical'?'var(--red)':e.sev==='High'?'var(--amber)':'var(--muted)'}"></div><div><strong>${esc(e.area)}</strong><span>${esc(e.what)}</span></div></div>`).join(''):'<div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><strong>Nothing outstanding</strong></div></div>'}</div></div>`;
 };
 
 /* ============================================================ CONTROL TOWER */
